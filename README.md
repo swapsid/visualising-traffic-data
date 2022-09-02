@@ -1,0 +1,2 @@
+# visualising-traffic-data
+ The following report comprises of different visualizations and analysis of a traffic data set of recorded on 22 November 2016, for N59 road in the IDA Business park in Lower Dangan, Galway. The data consists of different types of vehicles, the time stamp in which comes from one direction and goes to another direction of road among roads: A,B,C and D. We will be breaking down the report into tasks/sections consisting of a visualization of a particular distribution or proportion measure and analysis of the plots.
