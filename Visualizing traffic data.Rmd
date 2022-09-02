@@ -1,0 +1,357 @@
+
+
+The following report comprises of different visualizations and analysis of a traffic data set of recorded on 22 November 2016, for N59 road in the IDA Business park in Lower Dangan, Galway. The data consists of different types of vehicles, the time stamp in which comes from one direction and goes to another direction of road among roads: A,B,C and D. We will be breaking down the report into tasks/sections consisting of a visualization of a particular distribution or proportion measure and analysis of the plots.
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+options(knitr.duplicate.label = "allow")
+
+```
+
+First, we will be loading all the required libraries for the assignment. 
+
+```{r}
+
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(lubridate)
+library(knitr)
+library(kableExtra)
+library(scales)
+library(plotly)
+library(tidyverse)
+library(ggalluvial)
+library(colorblindr)
+library(treemapify)
+
+```
+
+
+**Task 1: Visualization of the distributions of vehicles per 15 minute interval per 
+vehicle type.**
+
+First we will be loading the dataset provided: Junction Turning Counts 2016 Outside DSI_LONG_FORMAT.
+
+```{r }
+#Loading the dataset
+traffic_data <- 
+  read_csv("./Junction Turning Counts 2016 Outside DSI_LONG_FORMAT.csv")
+
+#Printing the tibble
+head(traffic_data)
+
+```
+
+The dataset consists of 4 columns: TIME, turn, vehicle and count of that particular vehicle at that particular time.
+
+Now to find out the count of vehicles per 15 minute interval we will be creating a new tibble and using summarize we will be grouping each vehicle type along with the count of vehicle at every timestamp provided.
+
+
+```{r}
+#Creating a new tibble to store the count of vehicle 
+#at every timestamp per vehicle
+traffic_data1 <- traffic_data %>% group_by(vehicle,TIME) %>% 
+  summarize(count_of_vehicle = sum(count))
+
+#Changing the vehicle abbreviations full name of the vehicles 
+traffic_data1$vehicle[traffic_data1$vehicle=="PCL"] = "Pedal Cycle"
+traffic_data1$vehicle[traffic_data1$vehicle=="MCL"] = "Motorcycle"
+traffic_data1$vehicle[traffic_data1$vehicle=="CAR"] = "Cars"
+traffic_data1$vehicle[traffic_data1$vehicle=="TAXI"] = "Taxi Vehicles"
+traffic_data1$vehicle[traffic_data1$vehicle=="LGV"] = "Light Goods Vehicle"
+traffic_data1$vehicle[traffic_data1$vehicle=="OGV1"] = "Ordinary Goods Vehicle 1"
+traffic_data1$vehicle[traffic_data1$vehicle=="OGV2"] = "Ordinary Goods Vehicle 2"
+traffic_data1$vehicle[traffic_data1$vehicle=="CDB"] = "City Direct Bus"
+traffic_data1$vehicle[traffic_data1$vehicle=="BEB"] = "Bus Eireann Bus"
+traffic_data1$vehicle[traffic_data1$vehicle=="OB"] = "Other Bus"
+
+
+#Printing the resultant tibble
+head(traffic_data1)
+
+
+```
+
+For the first visualization, I experimented different types of plots, among which I found a bar useful here, however I then tried creating a plot using geom_point while added a smoother and applying facet_wrap as per Vehicle Name and observed I am getting much more interpretable graph for each Vehicle Type. The smoother is also helping identifying the trend of the data points.
+
+In the plot done using geom_point I have kept the stat equal to identity which is bin by default so as that the point represnts value on the data and accordingly map the value. have used theme_minimal() to avoid background annotations, I have removed the axis line and ticks as the x-axis has Time along it, the time breakdown is easy interpretative. For the face_wrap I have kept the scale free so that for each type of vehicle in each facet, according to the distribution the scales can adjust.  I have also adjusted the axis text so as to maintain the aesthetics. I have also removed the panel grids and background so as to improve the aesthetics.
+
+
+```{r}
+
+
+#Plotting the distribution of vehicles while adding facet_wrap by vehicle type
+plot_task1<- ggplot(traffic_data1 ) + geom_point(aes(  stat = "identity",
+                                                       x = TIME , 
+                                                     y= count_of_vehicle , 
+                                            color = vehicle), size = 1.5 , 
+                                        alpha = 1, show.legend = F) +  
+#Adding smoother to the plot
+geom_smooth(aes(x = TIME , y= count_of_vehicle)) +
+#Applying facet wrap
+  facet_wrap(~vehicle, ncol = 4 , 
+             strip.position = "top", scales = "free")+
+
+#Providing the plot title
+ggtitle("Distributions of vehicles every 15 minute interval per 
+vehicle type") +ylab("Count of Vehicle")+ xlab("Time") +
+  #applying theme minimal
+theme_minimal() +
+  #defining extra theme elements
+  theme(
+    axis.line.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.line.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    panel.grid.major = element_blank(), 
+    panel.grid.minor = element_blank(),
+    panel.background = element_blank(), 
+    axis.text.x = element_text(angle = 90,vjust = 1,hjust = 1,
+                           size = 7, face = "bold"),
+    axis.text.y = element_text(angle = 360,vjust = 1,hjust = 1,
+                          size = 7, face = "bold"))
+
+
+
+plot_task1
+
+```
+
+**Observation:**
+On observing the plot, we an find that the most number of vehicle types are car which tend to peak in count at the early morning hours, followed by a dip in the noon with a slight rise around 1 PM. Then during the evenings, again we follow a rise in the count. This could be rises in the morning and evening could be due the general office timings. Light Goods Vehicles are next in count after cars which are more in the early morning and fairly consistent in count throughout the day. Pedal Cyles are mostly running more in the early mornings. Since the buses such as Bus Eireann Bus and City Direct Buses are timely every few hours or so, we an see their count as mostly 0 and at certain hours 1 and 2. However City Direct Buses are only one every few hours a day. Other Buses are more in count numbers throughout the day in comparison the  and the least is city bus. Motor cycle. Taxi Vehicles run throughout the day however peaking more at around 10 AM and 4 PM while Motocycles are rare counts on the roads. The smoother clearly helps us to observe the trend of counts of vehicles at the junction throughout the day.
+
+
+**Part 2: Visualization that shows how the proportions of the traffic coming from D 
+divides into the roads indicated by A, B and C at different times of the day.**
+
+For visualizing the proportion of traffic coming from D and going along A, B, C at different times of day, we will be first creating a new tibble providing conditional clauses for different parts of the day. Then we will be filtering the dataframe with our required turns which are DA, DB and D. Then we will be grouping the part of the day with the count of each turn. 
+
+
+```{r}
+
+
+#Creating another tibble grouping the timestamps into parts of the day using conditions
+traffic_data2 <- traffic_data %>%
+    mutate(Day_Part = case_when(
+      TIME >= '2016-11-23 07:00:00' & 
+        TIME<='2016-11-23 09:30:00' ~ 'Early Morning',
+      TIME >= '2016-11-23 09:30:00' & 
+        TIME<='2016-11-23 12:00:00' ~ 'Late morning',
+      TIME >= '2016-11-23 12:00:00' & 
+        TIME<='2016-11-23 14:30:00' ~ 'Afternoon',
+      TIME >= '2016-11-23 14:30:00' & 
+        TIME<='2016-11-23 17:00:00' ~ 'Late afternoon',
+      TIME >= '2016-11-23 1:00:00' & 
+        TIME<='2016-11-23 19:00:00' ~ 'Evening' ))
+
+
+#Filtering the reqruied turns for the task
+traffic_data2 <- traffic_data2 %>%filter(grepl('DA|DB|DC', turn))
+
+#Finding the total counts of turns by the part of the day
+traffic_data2 <- traffic_data2 %>% group_by(Day_Part,turn) %>%
+  summarise(turncount = sum(count))
+
+
+traffic_data2
+
+```
+
+To visulaize the data now, we will be plotting a parallel plot which is especially designed to visualize and analyse multi-variate data which in our case are the different turns and parts of the day along with their proportion counts. For plotting I have used gg_alluvium with geom_stratum for defining the strata. Alluvium plot shows the trend of flow of one variable to another. The size of the flow deteremines the density of the counts here. With the plot we can observe the turn(flow) of vehicles from turn D to A, B and C during different parts of the day. I have adjusted the width of the strata so as that plot does not looks cluttered. I have also not added a separate pallete using scale_fill_brewer as the default pallete was more differentiable here. The scale added 
+
+```{r}
+
+#Plotting the parallet plot using geom_alluvium
+plot_task2<-ggplot(as.data.frame(traffic_data2),
+       aes(y = turncount, axis1 = turn, axis2 = Day_Part)) + 
+  geom_alluvium(aes(fill = turn), width = 1/15) +
+  geom_stratum(width = 1/5, fill = "azure3", color = "darkgrey") +
+  geom_label(stat = "stratum", aes(label = after_stat(stratum))) +
+  scale_x_discrete(limits = c("TURN", "DAY"), expand = c(.05, .05)) +
+  ggtitle("Proportions of traffic from D into A, B and C at different times of the day")+ylab("Turn Count") + theme_minimal()
+
+plot_task2
+
+```
+
+**Observation:**
+We can observe that the most frequent turn on the junction is DB, and heavily used after the mornings throughout the day. Followed by DB, turn DC is most used and used consistently. The visualization clearly also interprets the proportion size of the turns on the turn scale and the part of the day the turn was busiest. The blocks on the vertical axes can be observed to be are stacked bar chart which describes the proportion. The turn counts provides the total number of turns out which the proportions(of each turns) are derived.
+
+
+**Task 3: Visualization of the volume of vehicles at this junction per vehicle type at 
+each time-stamp in the data set.**
+
+For visualizing the volume of vehicles at this junction per vehicle type at each time-stamp I will be using the same tibble as used in task 1.
+
+```{r}
+#Printing the tibble
+head(traffic_data1)
+```
+
+We will plotting the volumne of vechile at each timestamp using a heatmap. A heatmap plots the values for a main variable of interest across two axis variables as a grid of colored squares, where colour of each cell represents the value of the main variable in the corresponding cell range. Our main variable here is the count and the corresponding axes are the vehicle types and the different timestamps. We can observe the trend of the volume of vehicle along the colour gradient.  
+
+We have set the coord_cartesian plot as off which helps in zooming the plot without affecting the scale limits of the data.
+TO set the scale of the map, we have used the scale_x_datetime function with limits as the start and end time of the day and adding breaks at every 15 mins as the timestamp of the data is also in 15 minutes intervals. Using the scale_fill_viridis_c we define the order of colors in the scale. In setting the theme of the plot, a greater emphasis has been given on setting the legend and the x-axis text. As the time-stamps are dense in number, I have used angle of 90 degrees in the element_text and set the legend position accordingly so as to not affect our plot.
+
+```{r}
+
+
+plot_task3 <- ggplot(traffic_data1, aes(x=TIME, y=vehicle, 
+                                        fill = count_of_vehicle)) +
+  geom_tile(colour = "white") +
+
+  #Added break for time on the x-axis of 15 minutes as the data
+  scale_x_datetime(limits = c(as.POSIXct("2016-11-23 07:00:00"),
+                              as.POSIXct("2016-11-23 19:00:00")),
+                   breaks = scales::date_breaks("15 mins"), 
+                   date_labels = "%H:%M")+
+  #For the heat map plot option A has been used 
+  scale_fill_viridis_c(option = "A", begin = 0.1, end = 0.9, direction = -1,
+                       name = "Volume of vehicles at the junction per vehicle 
+                       type at each time-stamp",
+                       #Setting guide bar values
+                       guide = guide_colourbar(direction = "horizontal", 
+                                               barwidth = 10,
+                                               barheight = 0.5)) +
+  #Setting the coord_cartesian plot as off
+  coord_cartesian(clip = 'off') +
+  #Title of plot
+  ggtitle(c("Volume of vehicles at the junction per vehicle type at each time-stamp")) +
+
+  #Defining the theme elements of the plot
+  theme(axis.text.y = 
+          element_text(size=5.6), 
+        axis.text.x = element_text(size=7, angle = 90, vjust = 1, hjust = 1,
+                           face = "bold"),
+        axis.ticks.x = element_line(size=0.1, colour = "black"),
+        axis.line.x = element_line(size=0.1, colour = "black"),
+        axis.ticks.y = element_blank(),
+        axis.line.y = element_blank(),
+        panel.background = element_blank(),
+        panel.grid = element_blank(),
+        plot.margin = unit(c(0.5, 0.5, 1, 0.5), "cm"),
+        plot.title = element_text(size=10, face="bold"),
+        #Defining the legend theme elements
+        legend.text = element_text(size = 7),
+        legend.position = c(0.8, -0.2),
+        legend.title = element_blank())
+ 
+plot_task3
+
+```
+**Observation:**
+
+We observe that car are have the most volume throughout the day in the heatmap. Where early mornings we have trend of more cars at the junction and late evenings. Most other vechiles are low in count(below 100), throughout the day, however among them Light Good Vehciles seems to have a higher count.
+
+**Part 4: Visualization that shows the proportion of these categories of vehicles and 
+their subcategories**
+
+We will be first creating a new tibble by grouping the different types of vehicle into 4 major categories using conditional clauses. The difference categories of vehicles are: Two-wheel, Cars, Goods, Buses and Public Transport.
+
+```{r}
+
+#Creating a new tibble
+traffic_data4 <- traffic_data %>%
+    mutate(vehicle_type = case_when(vehicle == 'CDB'~ 'Buses & public transport',
+                                  vehicle == 'BEB'~ 'Buses & public transport',
+                                  vehicle == 'OB'~ 'Buses & public transport',
+                                  vehicle == 'CAR'  ~ 'Cars',
+                                  vehicle == 'TAXI' ~ 'Cars',
+                                  vehicle == 'LGV'~'Goods vehicles',
+                                  vehicle == 'OGV1'~ 'Goods vehicles',
+                                  vehicle == 'OGV2'~ 'Goods vehicles',
+                                  vehicle == 'PCL' ~ 'Two-wheel vehicles',
+                                  vehicle == 'MCL' ~ 'Two-wheel vehicles'))
+
+#Performing group_by operation summarzing the total count of vehicle types
+traffic_data4  <- traffic_data4  %>% group_by(vehicle_type,vehicle) %>% 
+  summarize(total_count = sum(count))
+
+#categorizing the vehicle types and storing as levels
+traffic_data4$vehicle_type <- factor(traffic_data4$vehicle_type,
+                                     levels = c("Buses & public transport",
+                                                "Cars",
+                                                "Goods vehicles",
+                                                "Two-wheel vehicles"))
+#Printing the tibble
+traffic_data4
+
+```
+
+For plotting the above tibbble represnting the proportion of these categories of vehicles and 
+their subcategories a tree map will bei ideal choice since it can represnts the proportion of counts for each vehicle through using area size. Essentially, a tree map provides a 2D representation of hierarchical information and generally we can derive a gist of the story.
+For plotting the treemap, we will be first setting the number of palettes required thorugh the number of vechile types in our data the we will be calculating the colour along with the area for our all vehicles types.
+
+In the theme element of the plot, by adding the scale_fill_identity() we are removing the scale legend as our data is already been scaled. We have set the coord_cartesian plot as off which helps in zooming the plot without affecting the scale limits of the data.
+Also, for the text elements of the tree map I experimented with different size and colors to get better aesthetic element for the plot.
+
+```{r}
+# Defining the number of palettes needed per vehicle type
+n<- length(unique(traffic_data4$vehicle_type))
+
+#Calculating the the colors for each data point 
+traffic_data4 <- traffic_data4 %>%
+  mutate(index = as.numeric(vehicle_type)) %>%
+  group_by(index) %>%
+  mutate(
+    max_area = max(total_count),
+    colour = gradient_n_pal(
+      sequential_hcl(
+        6,
+        h = 360 * index[1]/n,
+        c = c(95, 20),
+        l = c(60, 90),
+        power = 0.6)
+      )(1- (total_count/max_area))
+    )
+
+#Defining the plot with axis elements and subgroup
+plot_task4 <-ggplot(data = traffic_data4 , aes(area = total_count , fill = colour, 
+                                            subgroup = traffic_data4$vehicle_type)) +
+#Defining the treemap 
+geom_treemap(colour = "white", size = 0.5*.pt, alpha = NA)  +
+  
+  #Defining the treemap text elements
+  geom_treemap_text(aes(label = vehicle), colour = "black" , size =8, place = "topleft",
+                    fontface = "bold",padding.x = grid::unit(1.5, "mm"),padding.y = 
+                      grid::unit(1.5, "mm")) +
+
+#Adding the theme text element of the tree-map
+  geom_treemap_text(aes(label = format(total_count, nsmall=0, big.mark=",",trim=TRUE)),
+                    color = "black", size = 8, place = "topleft", min.size = 3, 
+                    padding.x = grid::unit(1.5, "mm"), padding.y = grid::unit(15, 
+                                                                    "points"))+
+  #Defining the border of the sub-group
+  geom_treemap_subgroup_border(colour = "white", size =0.7) + 
+  #Defining the theme text element of subgroup
+  geom_treemap_subgroup_text(grow = FALSE,  colour = "black", size = 62,  place =
+                               "bottomleft", fontface = "bold", alpha = 0.7) +
+  #Using the values without scaling
+  scale_fill_identity()+
+ #Setting the coord_cartesian plot as off
+  coord_cartesian(clip = "off") 
+
+
+plot_task4
+
+
+```
+
+
+There are three major aesthetics which we are important to observe here:
+
+1. Tile area: The tile area respents the count of vehicle by area proportions. The count of each vehicle is represented by portion of area it covers in the total plot area in 2D space.
+
+2. Colour Scale: The colour scale represents the parent level vehicle types – ie. blue for Ulster, purple for Good Vehicle, Pink for Two-wheel Vehicle and Green for Bus & public transports.
+
+3. Sequential colour scales – This is associated with the color assigned to each vehicle type Each colour scale represents count of vehicle. In the colour gradient used, a dark shade indicates a high value and a light shade indicates a low value of the count.
+
+We can clearly observe that Cars are the major class of vehicle, followed by Good Vechiles and then Two-wheel vehicles. The least proportion is that of Buses & public transport.
+
